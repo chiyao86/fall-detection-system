@@ -13,8 +13,8 @@ if [ $? -eq 0 ]; then
     echo "=========================================="
     echo "啟動應用程式..."
     echo "=========================================="
-    # 啟動 Gunicorn - 增加 timeout 到 300 秒，處理多張圖片需要更長時間
-    exec gunicorn -b 0.0.0.0:$PORT -w 2 --timeout 300 --graceful-timeout 30 run:app
+    # 啟動 Gunicorn - 單 worker + 多線程，確保 in-memory 狀態一致
+    exec gunicorn -b 0.0.0.0:$PORT -w 1 --threads 4 --timeout 300 --graceful-timeout 30 run:app
 else
     echo "✗ 資料庫初始化失敗，應用程式無法啟動"
     exit 1
