@@ -31,9 +31,10 @@ graph TB
 ```
 ├── app/
 │   ├── __init__.py          # App Factory (create_app)
-│   ├── config.py            # .env 設定讀取
+│   ├── config.py            # .env 設定讀取（支援 DATABASE_URL）
 │   ├── extensions.py        # SQLAlchemy / Migrate
 │   ├── models.py            # FallEvent ORM
+│   ├── utils.py             # 共用工具（時區、時間函數等）
 │   ├── api/
 │   │   ├── upload.py        # 圖片/影片上傳 + 拆幀
 │   │   ├── analyze.py       # 跌倒偵測分析
@@ -42,8 +43,10 @@ graph TB
 │       ├── vision.py        # Groq Vision 呼叫
 │       ├── notification.py  # LINE + SMS + 去重
 │       └── sheets.py        # Google Sheets 同步
+├── migrations/              # 資料庫遷移（Alembic）
 ├── templates/index.html     # 前端 UI
 ├── uploads/                 # 上傳檔案
+├── test_images/             # 測試圖片（不納入版本控制）
 ├── .env / .env.example      # 環境變數
 ├── requirements.txt
 ├── run.py                   # 啟動入口

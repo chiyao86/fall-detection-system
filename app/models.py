@@ -1,10 +1,7 @@
 from datetime import datetime
 
-import pytz
-
 from app.extensions import db
-
-TZ = pytz.timezone("Asia/Taipei")
+from app.utils import TZ
 
 
 class FallEvent(db.Model):

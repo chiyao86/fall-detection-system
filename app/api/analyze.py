@@ -6,7 +6,8 @@ import threading
 from flask import Blueprint, current_app, jsonify, request
 
 from app.extensions import db
-from app.models import FallEvent, TZ
+from app.models import FallEvent
+from app.utils import get_taiwan_time_str
 from app.services.vision import analyze_single_image, analyze_image_sequence
 from app.services.notification import notify_fall_event
 from app.services.sheets import write_to_google_sheet
@@ -20,11 +21,6 @@ processing_status = {
     "total": 0,
     "current_file": "",
 }
-
-
-def _get_taiwan_time_str() -> str:
-    from datetime import datetime
-    return datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _save_event(filename: str, image_path: str, result: dict, timestamp_str: str, google_sheets: bool):
@@ -66,7 +62,7 @@ def _batch_individual(app, files: list, custom_prompt: str | None, google_sheets
                         continue
 
                     result = analyze_single_image(image_path, custom_prompt)
-                    _save_event(f_info["original_name"], image_path, result, _get_taiwan_time_str(), google_sheets)
+                    _save_event(f_info["original_name"], image_path, result, get_taiwan_time_str(), google_sheets)
                 except Exception as e:
                     current_app.logger.error(f"分析失敗 {f_info.get('original_name')}: {e}")
     finally:
@@ -86,7 +82,7 @@ def _batch_sequence(app, files: list, custom_prompt: str | None, google_sheets: 
                 result = analyze_image_sequence(paths, custom_prompt)
 
                 seq_name = f"序列分析 ({len(paths)} 張)"
-                _save_event(seq_name, paths[0] if paths else "", result, _get_taiwan_time_str(), google_sheets)
+                _save_event(seq_name, paths[0] if paths else "", result, get_taiwan_time_str(), google_sheets)
             except Exception as e:
                 current_app.logger.error(f"序列分析失敗: {e}")
     finally:
@@ -110,7 +106,7 @@ def _batch_grouped(app, groups: list, custom_prompt: str | None, google_sheets: 
 
                     result = analyze_image_sequence(paths, custom_prompt)
                     group_name = f"錄影片段 {g_idx + 1} ({len(paths)} 張)"
-                    _save_event(group_name, paths[0], result, _get_taiwan_time_str(), google_sheets)
+                    _save_event(group_name, paths[0], result, get_taiwan_time_str(), google_sheets)
                 except Exception as e:
                     current_app.logger.error(f"第 {g_idx + 1} 組分析失敗: {e}")
     finally:

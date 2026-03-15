@@ -18,11 +18,11 @@ venv/
 uploads/*
 !uploads/.gitkeep
 
+# Test images
+test_images/
+
 # Credentials
 key.json
-
-# Database
-migrations/
 
 # OS
 .DS_Store

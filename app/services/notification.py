@@ -1,11 +1,6 @@
 """通知 service — LINE Bot + Twilio SMS"""
 
-from datetime import datetime
-
-import pytz
 from flask import current_app
-
-TZ = pytz.timezone("Asia/Taipei")
 
 
 def send_line_message(description: str, filename: str, timestamp: str) -> bool:
