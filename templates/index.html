@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fall Detection System - 老人跌倒偵測系統</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: #0a0e27;
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        .bg-animation {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; z-index: 0; opacity: 0.3;
+            background:
+                linear-gradient(90deg, transparent 0%, rgba(0,255,255,0.1) 50%, transparent 100%),
+                radial-gradient(circle at 20% 50%, rgba(120,0,255,0.2) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(0,255,255,0.2) 0%, transparent 50%);
+        }
+
+        @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:.5} }
+        .bg-animation::before {
+            content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%;
+            background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,255,0.03) 2px,rgba(0,255,255,0.03) 4px);
+            animation: pulse 4s ease-in-out infinite;
+        }
+
+        .container { max-width:1400px; margin:0 auto; position:relative; z-index:1; }
+
+        .header { text-align:center; margin-bottom:40px; }
+        .logo {
+            font-size:2.5em;
+            background: linear-gradient(135deg,#00ffff,#7000ff,#ff00ff);
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+            font-weight:900; letter-spacing:3px; text-transform:uppercase; margin-bottom:10px;
+            animation: glow 3s ease-in-out infinite;
+        }
+        @keyframes glow { 0%,100%{filter:drop-shadow(0 0 10px rgba(0,255,255,0.5))} 50%{filter:drop-shadow(0 0 20px rgba(0,255,255,0.8))} }
+        .subtitle { color:#00ffff; font-size:1.1em; letter-spacing:2px; text-transform:uppercase; opacity:0.8; }
+
+        /* 標籤頁 */
+        .tabs {
+            display:flex; gap:10px; margin-bottom:30px;
+            background:rgba(15,23,42,0.6); padding:10px; border-radius:15px;
+            border:1px solid rgba(0,255,255,0.2);
+        }
+        .tab-button {
+            flex:1; padding:15px 20px;
+            background:rgba(10,14,39,0.6); border:1px solid rgba(0,255,255,0.3);
+            border-radius:10px; color:#00ffff; font-size:1em; font-weight:600;
+            cursor:pointer; transition:all 0.3s;
+            display:flex; align-items:center; justify-content:center; gap:10px;
+        }
+        .tab-button:hover { background:rgba(0,255,255,0.1); border-color:#00ffff; }
+        .tab-button.active {
+            background:linear-gradient(135deg,#00ffff,#7000ff);
+            border-color:#00ffff; color:#fff;
+            box-shadow:0 5px 20px rgba(0,255,255,0.4);
+        }
+        .tab-content { display:none; }
+        .tab-content.active { display:block; }
+
+        .grid {
+            display:grid; grid-template-columns:repeat(auto-fit,minmax(500px,1fr));
+            gap:30px; margin-bottom:30px;
+        }
+
+        .card {
+            background:rgba(15,23,42,0.8); backdrop-filter:blur(10px);
+            border:1px solid rgba(0,255,255,0.2); border-radius:20px;
+            padding:30px; position:relative; overflow:hidden; transition:all 0.3s ease;
+        }
+        .card::before {
+            content:''; position:absolute; top:0; left:-100%; width:100%; height:2px;
+            background:linear-gradient(90deg,transparent,#00ffff,transparent);
+            animation:scan 3s linear infinite;
+        }
+        @keyframes scan { 0%{left:-100%} 100%{left:100%} }
+        .card:hover { border-color:rgba(0,255,255,0.5); transform:translateY(-5px); box-shadow:0 10px 40px rgba(0,255,255,0.2); }
+
+        .card-header {
+            display:flex; align-items:center; gap:15px; margin-bottom:25px;
+            padding-bottom:15px; border-bottom:1px solid rgba(0,255,255,0.2);
+        }
+        .card-icon {
+            width:50px; height:50px;
+            background:linear-gradient(135deg,#00ffff,#7000ff);
+            border-radius:12px; display:flex; align-items:center; justify-content:center;
+            font-size:1.5em; box-shadow:0 5px 15px rgba(0,255,255,0.3);
+        }
+        .card-title { color:#00ffff; font-size:1.4em; font-weight:700; text-transform:uppercase; letter-spacing:1px; }
+
+        .input-group { margin-bottom:20px; }
+        label { display:block; margin-bottom:10px; color:#00ffff; font-weight:600; font-size:0.9em; text-transform:uppercase; letter-spacing:1px; }
+        input[type="text"],input[type="number"],select,textarea {
+            width:100%; padding:15px; background:rgba(10,14,39,0.6);
+            border:1px solid rgba(0,255,255,0.3); border-radius:10px;
+            color:#fff; font-size:14px; transition:all 0.3s; font-family:'Consolas',monospace;
+        }
+        input:focus,textarea:focus { outline:none; border-color:#00ffff; box-shadow:0 0 20px rgba(0,255,255,0.3); background:rgba(10,14,39,0.8); }
+        textarea { resize:vertical; min-height:100px; }
+
+        .file-upload {
+            border:2px dashed rgba(0,255,255,0.3); border-radius:15px; padding:50px;
+            text-align:center; cursor:pointer; transition:all 0.3s;
+            background:rgba(10,14,39,0.4); position:relative; overflow:hidden;
+        }
+        .file-upload:hover { border-color:#00ffff; background:rgba(0,255,255,0.05); box-shadow:0 0 30px rgba(0,255,255,0.2); }
+        .file-upload.dragover { border-color:#ff00ff; background:rgba(255,0,255,0.05); box-shadow:0 0 40px rgba(255,0,255,0.3); }
+        #fileInput, #videoInput { display:none; }
+        .upload-icon { font-size:4em; margin-bottom:20px; animation:float 3s ease-in-out infinite; }
+        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+        .upload-text { font-size:1.3em; color:#00ffff; margin-bottom:10px; font-weight:600; }
+        .upload-subtext { color:rgba(0,255,255,0.6); font-size:0.9em; }
+        .file-info { color:#00ff00; margin-top:20px; font-weight:600; font-size:1.1em; text-shadow:0 0 10px rgba(0,255,0,0.5); }
+
+        .preview-container {
+            display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+            gap:15px; margin-top:20px; max-height:400px; overflow-y:auto;
+        }
+        .preview-item {
+            position:relative; border:2px solid rgba(0,255,255,0.3); border-radius:10px;
+            overflow:hidden; background:rgba(10,14,39,0.6); transition:all 0.3s;
+        }
+        .preview-item:hover { border-color:#00ffff; box-shadow:0 0 20px rgba(0,255,255,0.3); }
+        .preview-item img { width:100%; height:150px; object-fit:cover; display:block; }
+        .preview-info { padding:10px; color:#00ffff; font-size:0.8em; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .preview-remove {
+            position:absolute; top:5px; right:5px; background:rgba(255,0,102,0.9);
+            color:#fff; border:none; border-radius:50%; width:30px; height:30px;
+            cursor:pointer; font-size:18px; display:flex; align-items:center; justify-content:center;
+            transition:all 0.3s; z-index:10;
+        }
+        .preview-remove:hover { background:#ff0066; transform:scale(1.1); }
+
+        .checkbox-group {
+            display:flex; align-items:center; gap:15px; margin-bottom:15px; padding:15px;
+            background:rgba(0,255,255,0.05); border-radius:10px; border:1px solid rgba(0,255,255,0.2);
+            cursor:pointer; transition:all 0.3s;
+        }
+        .checkbox-group:hover { background:rgba(0,255,255,0.1); border-color:rgba(0,255,255,0.4); }
+        .checkbox-group input[type="checkbox"] { width:24px; height:24px; cursor:pointer; accent-color:#00ffff; }
+        .checkbox-group label { margin:0; cursor:pointer; font-weight:600; color:#fff; }
+
+        .btn {
+            padding:18px 40px; border:none; border-radius:12px; font-size:18px; font-weight:700;
+            cursor:pointer; transition:all 0.3s; display:inline-flex; align-items:center;
+            gap:12px; justify-content:center; text-transform:uppercase; letter-spacing:2px;
+            position:relative; overflow:hidden;
+        }
+        .btn::before {
+            content:''; position:absolute; top:50%; left:50%;
+            transform:translate(-50%,-50%); width:0; height:0; border-radius:50%;
+            background:rgba(255,255,255,0.2); transition:width 0.6s,height 0.6s; pointer-events:none;
+        }
+        .btn:hover::before { width:300px; height:300px; }
+
+        .btn-primary { background:linear-gradient(135deg,#00ffff,#7000ff); color:#fff; width:100%; font-size:1.3em; box-shadow:0 10px 30px rgba(0,255,255,0.3); }
+        .btn-primary:hover:not(:disabled) { transform:translateY(-3px); box-shadow:0 15px 40px rgba(0,255,255,0.5); }
+        .btn-primary:disabled { opacity:0.5; cursor:not-allowed; }
+        .btn-secondary { background:rgba(108,117,125,0.3); color:#fff; border:1px solid rgba(255,255,255,0.3); }
+        .btn-secondary:hover { background:rgba(108,117,125,0.5); border-color:rgba(255,255,255,0.5); }
+        .btn-success { background:linear-gradient(135deg,#00ff88,#00ffff); color:#0a0e27; border:none; }
+        .btn-success:hover { transform:translateY(-2px); box-shadow:0 10px 30px rgba(0,255,136,0.4); }
+        .btn-danger { background:linear-gradient(135deg,#ff0066,#ff00ff); color:#fff; border:none; }
+        .btn-danger:hover { transform:translateY(-2px); box-shadow:0 10px 30px rgba(255,0,102,0.4); }
+
+        .button-group { display:flex; gap:15px; margin-top:20px; }
+
+        .progress-container {
+            display:none; margin-top:40px; padding:35px;
+            background:rgba(15,23,42,0.8); backdrop-filter:blur(10px);
+            border:1px solid rgba(0,255,255,0.3); border-radius:20px;
+            box-shadow:0 10px 40px rgba(0,255,255,0.2);
+        }
+        .progress-title { color:#00ffff; font-size:1.3em; font-weight:700; margin-bottom:20px; text-transform:uppercase; letter-spacing:2px; }
+        .progress-bar { width:100%; height:40px; background:rgba(10,14,39,0.6); border-radius:20px; overflow:hidden; margin-bottom:20px; border:1px solid rgba(0,255,255,0.3); }
+        .progress-fill { height:100%; background:linear-gradient(90deg,#00ffff,#7000ff,#ff00ff); transition:width 0.3s; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:1.1em; }
+        .progress-info { text-align:center; color:#00ffff; font-size:1.1em; font-weight:600; }
+
+        .results-container { display:none; margin-top:40px; }
+        .result-item {
+            background:rgba(15,23,42,0.8); backdrop-filter:blur(10px); padding:25px;
+            margin-bottom:20px; border-radius:15px;
+            border-left:4px solid #00ffff; border:1px solid rgba(0,255,255,0.2);
+            box-shadow:0 5px 20px rgba(0,0,0,0.3); transition:all 0.3s;
+        }
+        .result-item:hover { border-color:rgba(0,255,255,0.5); transform:translateX(5px); box-shadow:0 8px 30px rgba(0,255,255,0.2); }
+        .result-item.fall-detected { border-left:4px solid #ff0066; }
+        .result-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; padding-bottom:15px; border-bottom:1px solid rgba(0,255,255,0.2); }
+        .result-filename { font-weight:700; color:#00ffff; font-size:1.1em; }
+        .result-timestamp { color:rgba(0,255,255,0.7); font-size:0.9em; font-family:'Consolas',monospace; }
+        .result-content { color:#fff; line-height:1.8; white-space:pre-wrap; font-size:0.95em; }
+        .result-badge {
+            display:inline-block; padding:4px 12px; border-radius:20px; font-size:0.8em; font-weight:700; margin-right:8px;
+        }
+        .badge-safe { background:rgba(0,255,136,0.2); color:#00ff88; border:1px solid rgba(0,255,136,0.3); }
+        .badge-fall { background:rgba(255,0,102,0.2); color:#ff0066; border:1px solid rgba(255,0,102,0.3); }
+
+        .collapsible-section { margin-bottom:20px; }
+        .collapsible-header {
+            cursor:pointer; padding:15px; background:rgba(0,255,255,0.05);
+            border-radius:10px; display:flex; justify-content:space-between; align-items:center;
+            transition:all 0.3s; border:1px solid rgba(0,255,255,0.2);
+        }
+        .collapsible-header:hover { background:rgba(0,255,255,0.1); border-color:rgba(0,255,255,0.4); }
+        .collapsible-content { max-height:0; overflow:hidden; transition:max-height 0.3s ease-out; padding:0 15px; }
+        .collapsible-content.active { max-height:2000px; padding:20px 15px; }
+        .info-box { background:rgba(0,255,255,0.05); border:1px solid rgba(0,255,255,0.2); border-radius:10px; padding:15px; margin-top:15px; color:rgba(0,255,255,0.8); line-height:1.8; }
+        .arrow { color:#00ffff; font-size:1.2em; transition:transform 0.3s; }
+        .arrow.active { transform:rotate(180deg); }
+
+        /* 事件歷史表格 */
+        .event-table { width:100%; border-collapse:collapse; margin-top:20px; }
+        .event-table th { background:rgba(0,255,255,0.1); color:#00ffff; padding:12px; text-align:left; font-size:0.9em; border-bottom:2px solid rgba(0,255,255,0.3); }
+        .event-table td { padding:12px; color:#fff; border-bottom:1px solid rgba(0,255,255,0.1); font-size:0.9em; }
+        .event-table tr:hover td { background:rgba(0,255,255,0.05); }
+
+        /* 統計看板 */
+        .stats-bar {
+            display:grid; grid-template-columns:repeat(4,1fr); gap:15px; margin-bottom:30px;
+        }
+        .stat-card {
+            background:rgba(15,23,42,0.8); border:1px solid rgba(0,255,255,0.2);
+            border-radius:12px; padding:20px; text-align:center;
+        }
+        .stat-number { font-size:2em; font-weight:900; color:#00ffff; }
+        .stat-label { color:rgba(0,255,255,0.7); font-size:0.85em; margin-top:5px; text-transform:uppercase; }
+
+        @media (max-width:768px) {
+            .grid { grid-template-columns:1fr; }
+            .tabs { flex-direction:column; }
+            .tab-button { width:100%; }
+            .button-group { flex-direction:column; }
+            .btn { width:100%; }
+            .stats-bar { grid-template-columns:repeat(2,1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+
+    <div class="container">
+        <div class="header">
+            <div class="logo">🛡️ Fall Detection AI</div>
+            <div class="subtitle">老人跌倒偵測系統 — Elderly Fall Detection System</div>
+        </div>
+
+        <!-- 標籤頁 -->
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('upload')">
+                <span>📁</span> 圖片上傳
+            </button>
+            <button class="tab-button" onclick="switchTab('video')">
+                <span>🎬</span> 影片上傳
+            </button>
+            <button class="tab-button" onclick="switchTab('history')">
+                <span>📊</span> 事件歷史
+            </button>
+        </div>
+
+        <!-- ===== 上傳 + 設定區 ===== -->
+        <div id="tab-upload" class="tab-content active">
+            <div class="grid">
+                <!-- 設定 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">⚙️</div>
+                        <div class="card-title">分析設定</div>
+                    </div>
+                    <div class="input-group">
+                        <label for="prompt">自訂提示詞（選填，留空使用預設跌倒偵測）</label>
+                        <textarea id="prompt" placeholder="留空 = 使用系統內建跌倒偵測 prompt"></textarea>
+                    </div>
+                    <!-- Google Sheets -->
+                    <div class="collapsible-section">
+                        <div class="collapsible-header" onclick="toggleSection('googleSheets')">
+                            <div class="checkbox-group" style="margin:0;padding:0;background:none;border:none;">
+                                <input type="checkbox" id="googleSheetsEnabled" checked>
+                                <label for="googleSheetsEnabled">啟用 Google Sheets 同步</label>
+                            </div>
+                            <span class="arrow" id="googleSheetsArrow">▼</span>
+                        </div>
+                        <div class="collapsible-content" id="googleSheetsContent">
+                            <div class="info-box">
+                                ✅ 已在後端 .env 設定 Google Sheets<br>
+                                📊 辨識結果將自動同步至試算表
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 圖片上傳 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📤</div>
+                        <div class="card-title">Image Upload</div>
+                    </div>
+                    <div class="file-upload" id="dropZoneImage">
+                        <div class="upload-icon">🖼️</div>
+                        <div class="upload-text">拖曳檔案或點擊上傳</div>
+                        <div class="upload-subtext">支援多選 • PNG • JPG • JPEG • GIF • BMP</div>
+                        <input type="file" id="fileInput" multiple accept="image/*">
+                        <div class="file-info" id="fileInfo"></div>
+                    </div>
+                    <div class="preview-container" id="previewContainer"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 影片上傳區 ===== -->
+        <div id="tab-video" class="tab-content">
+            <div class="grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">⚙️</div>
+                        <div class="card-title">分析設定</div>
+                    </div>
+                    <div class="input-group">
+                        <label for="frameInterval">拆幀間隔（秒）</label>
+                        <input type="number" id="frameInterval" value="3" min="1" max="60" placeholder="每 N 秒提取一幀">
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🎬</div>
+                        <div class="card-title">Video Upload</div>
+                    </div>
+                    <div class="file-upload" id="dropZoneVideo">
+                        <div class="upload-icon">🎞️</div>
+                        <div class="upload-text">拖曳影片或點擊上傳</div>
+                        <div class="upload-subtext">支援 MP4 • AVI • MOV • MKV • WEBM</div>
+                        <input type="file" id="videoInput" multiple accept="video/*">
+                        <div class="file-info" id="videoInfo"></div>
+                    </div>
+                    <div class="preview-container" id="videoPreviewContainer"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 事件歷史區 ===== -->
+        <div id="tab-history" class="tab-content">
+            <div class="stats-bar" id="statsBar">
+                <div class="stat-card"><div class="stat-number" id="statTotal">-</div><div class="stat-label">總事件數</div></div>
+                <div class="stat-card"><div class="stat-number" id="statFalls">-</div><div class="stat-label">偵測跌倒</div></div>
+                <div class="stat-card"><div class="stat-number" id="statSafe">-</div><div class="stat-label">安全事件</div></div>
+                <div class="stat-card"><div class="stat-number" id="statNotified">-</div><div class="stat-label">已發通知</div></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">📊</div>
+                    <div class="card-title">Event History</div>
+                </div>
+                <div class="button-group" style="margin-bottom:20px;">
+                    <button class="btn btn-secondary" onclick="loadHistory()"><span>🔄</span> 刷新</button>
+                    <button class="btn btn-success" onclick="exportCSV()"><span>📥</span> Export CSV</button>
+                    <button class="btn btn-danger" onclick="clearAll()"><span>🗑️</span> Clear All</button>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table class="event-table" id="eventTable">
+                        <thead>
+                            <tr>
+                                <th>時間</th>
+                                <th>檔名</th>
+                                <th>跌倒偵測</th>
+                                <th>信心</th>
+                                <th>描述</th>
+                                <th>通知</th>
+                            </tr>
+                        </thead>
+                        <tbody id="eventTableBody">
+                            <tr><td colspan="6" style="text-align:center;color:rgba(0,255,255,0.5);">載入中…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作按鈕 -->
+        <button class="btn btn-primary" id="analyzeBtn" onclick="startAnalysis()">
+            <span>⚡</span> 開始跌倒偵測分析
+        </button>
+
+        <!-- 進度 -->
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-title">⚙️ Processing Status</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width:0%">0%</div>
+            </div>
+            <div class="progress-info" id="progressInfo">Initializing...</div>
+        </div>
+
+        <!-- 結果 -->
+        <div class="results-container" id="resultsContainer">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">📊</div>
+                    <div class="card-title">Recognition Results</div>
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-success" onclick="exportCSV()"><span>📥</span> Export CSV</button>
+                    <button class="btn btn-danger" onclick="clearAll()"><span>🗑️</span> Clear All</button>
+                </div>
+                <div id="resultsList" style="margin-top:30px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let uploadedFiles = [];
+        let fileObjects = [];
+
+        /* === 安全 JSON 解析 === */
+        async function safeJson(res) {
+            const text = await res.text();
+            try { return JSON.parse(text); }
+            catch { throw new Error(`伺服器回傳非 JSON（HTTP ${res.status}）：${text.slice(0, 120)}`)}
+        }
+
+        /* === 標籤頁切換 === */
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+            event.target.closest('.tab-button').classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById('tab-' + tabName).classList.add('active');
+
+            if (tabName === 'history') loadHistory();
+        }
+
+        /* === 圖片壓縮 === */
+        async function compressImage(file, maxWidth = 1920, quality = 0.8) {
+            return new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let w = img.width, h = img.height;
+                        if (w > maxWidth) { h = h * maxWidth / w; w = maxWidth; }
+                        canvas.width = w; canvas.height = h;
+                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                        canvas.toBlob(blob => {
+                            resolve(new File([blob], file.name, { type:'image/jpeg', lastModified:Date.now() }));
+                        }, 'image/jpeg', quality);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        /* === 圖片上傳 === */
+        const dropZoneImage = document.getElementById('dropZoneImage');
+        const fileInput = document.getElementById('fileInput');
+        const previewContainer = document.getElementById('previewContainer');
+
+        dropZoneImage.addEventListener('click', e => { e.stopPropagation(); fileInput.click(); });
+        dropZoneImage.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); dropZoneImage.classList.add('dragover'); });
+        dropZoneImage.addEventListener('dragleave', e => { e.preventDefault(); e.stopPropagation(); dropZoneImage.classList.remove('dragover'); });
+        dropZoneImage.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); dropZoneImage.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+        fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+        async function handleFiles(files) {
+            const arr = Array.from(files);
+            for (let i = 0; i < arr.length; i += 5) {
+                await uploadBatch(arr.slice(i, i + 5));
+            }
+        }
+
+        async function uploadBatch(files) {
+            const formData = new FormData();
+            for (const file of files) {
+                const compressed = await compressImage(file);
+                formData.append('files[]', compressed);
+                fileObjects.push(compressed);
+            }
+            try {
+                const res = await fetch('/api/upload', { method:'POST', body:formData });
+                const data = await safeJson(res);
+                if (data.success) {
+                    uploadedFiles = uploadedFiles.concat(data.files);
+                    updateFileInfo();
+                    displayPreviews();
+                } else { alert('上傳失敗: ' + (data.error || '未知錯誤')); }
+            } catch (err) { alert('上傳失敗: ' + err.message); }
+        }
+
+        function updateFileInfo() {
+            const sz = fileObjects.reduce((s, f) => s + f.size, 0);
+            document.getElementById('fileInfo').textContent = `✅ 已選擇 ${uploadedFiles.length} 個檔案 (${(sz/1024/1024).toFixed(2)} MB)`;
+        }
+
+        function displayPreviews() {
+            previewContainer.innerHTML = '';
+            fileObjects.forEach((file, idx) => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    div.innerHTML = `<img src="${e.target.result}" alt="${file.name}"><div class="preview-info">${file.name}</div><button class="preview-remove" onclick="removeFile(${idx})">×</button>`;
+                    previewContainer.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function removeFile(idx) {
+            fileObjects.splice(idx, 1);
+            uploadedFiles.splice(idx, 1);
+            updateFileInfo();
+            displayPreviews();
+            if (!uploadedFiles.length) document.getElementById('fileInfo').textContent = '';
+        }
+
+        /* === 影片上傳 === */
+        const dropZoneVideo = document.getElementById('dropZoneVideo');
+        const videoInput = document.getElementById('videoInput');
+
+        dropZoneVideo.addEventListener('click', e => { e.stopPropagation(); videoInput.click(); });
+        dropZoneVideo.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); dropZoneVideo.classList.add('dragover'); });
+        dropZoneVideo.addEventListener('dragleave', e => { e.preventDefault(); e.stopPropagation(); dropZoneVideo.classList.remove('dragover'); });
+        dropZoneVideo.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); dropZoneVideo.classList.remove('dragover'); handleVideoFiles(e.dataTransfer.files); });
+        videoInput.addEventListener('change', e => handleVideoFiles(e.target.files));
+
+        async function handleVideoFiles(files) {
+            const formData = new FormData();
+            formData.append('interval', document.getElementById('frameInterval').value);
+            for (const f of files) formData.append('files[]', f);
+            try {
+                document.getElementById('videoInfo').textContent = '⏳ 正在處理影片...';
+                const res = await fetch('/api/upload', { method:'POST', body:formData });
+                const data = await safeJson(res);
+                if (data.success) {
+                    uploadedFiles = uploadedFiles.concat(data.files);
+                    document.getElementById('videoInfo').textContent = `✅ 已提取 ${data.count} 個影片幀`;
+                    displayVideoFrames(data.files);
+                }
+            } catch (err) { alert('影片處理失敗: ' + err.message); document.getElementById('videoInfo').textContent = ''; }
+        }
+
+        function displayVideoFrames(frames) {
+            const container = document.getElementById('videoPreviewContainer');
+            container.innerHTML = '';
+            frames.forEach(f => {
+                const div = document.createElement('div');
+                div.className = 'preview-item';
+                div.innerHTML = `<div style="width:150px;height:150px;background:rgba(0,255,255,0.1);display:flex;align-items:center;justify-content:center"><span style="font-size:3em">🎞️</span></div><div class="preview-info">${f.original_name}</div>`;
+                container.appendChild(div);
+            });
+        }
+
+        /* === 折疊區 === */
+        function toggleSection(name) {
+            const content = document.getElementById(name + 'Content');
+            const arrow = document.getElementById(name + 'Arrow');
+            content.classList.toggle('active');
+            arrow.classList.toggle('active');
+        }
+
+        /* === 開始分析 === */
+        async function startAnalysis() {
+            const prompt = document.getElementById('prompt').value.trim();
+            if (!uploadedFiles.length) { alert('請先上傳圖片或影片'); return; }
+
+            const mode = 'individual';
+            if (!confirm(`確定要開始跬倒偉測分析嗎？\n共 ${uploadedFiles.length} 張圖片，逐張分析`)) return;
+
+            const body = {
+                prompt: prompt || null,
+                files: uploadedFiles,
+                analyze_mode: mode,
+                google_sheets_enabled: document.getElementById('googleSheetsEnabled').checked,
+            };
+
+            try {
+                const res = await fetch('/api/analyze', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+                const data = await safeJson(res);
+                if (data.success) {
+                    document.getElementById('progressContainer').style.display = 'block';
+                    document.getElementById('analyzeBtn').disabled = true;
+                    startPolling();
+                } else { alert('請求失敗: ' + data.error); }
+            } catch (err) { alert('請求失敗: ' + err.message); }
+        }
+
+        /* === 輪詢進度 === */
+        let pollingInterval;
+        function startPolling() {
+            let pollCount = 0;
+            const MAX_POLLS = 120; // 最多等 120 秒
+            pollingInterval = setInterval(async () => {
+                pollCount++;
+                if (pollCount > MAX_POLLS) {
+                    clearInterval(pollingInterval);
+                    document.getElementById('progressInfo').textContent = '⚠️ 分析逾時，請確認後端是否正常運作';
+                    document.getElementById('analyzeBtn').disabled = false;
+                    return;
+                }
+                try {
+                    const res = await fetch('/api/status');
+                    const data = await safeJson(res);
+                    if (data.success) {
+                        const s = data.status;
+                        const pct = s.total > 0 ? Math.round(s.current / s.total * 100) : 0;
+                        document.getElementById('progressFill').style.width = pct + '%';
+                        document.getElementById('progressFill').textContent = pct + '%';
+                        document.getElementById('progressInfo').textContent = `處理中: ${s.current} / ${s.total} — ${s.current_file}`;
+
+                        if (!s.is_processing && s.total > 0) {
+                            clearInterval(pollingInterval);
+                            document.getElementById('progressInfo').textContent = '✅ 處理完成！';
+                            document.getElementById('analyzeBtn').disabled = false;
+                            loadResults();
+                        }
+                    }
+                } catch (err) { console.error('Polling error:', err); }
+            }, 1000);
+        }
+
+        /* === 載入結果 === */
+        async function loadResults() {
+            try {
+                const res = await fetch('/api/results');
+                const data = await safeJson(res);
+                if (data.success && data.results.length) {
+                    document.getElementById('resultsContainer').style.display = 'block';
+                    const list = document.getElementById('resultsList');
+                    list.innerHTML = '';
+
+                    data.results.forEach(r => {
+                        const isFall = r.fall_detected;
+                        const badge = isFall
+                            ? `<span class="result-badge badge-fall">🚨 跌倒</span><span class="result-badge" style="background:rgba(255,200,0,0.2);color:#ffc800;border:1px solid rgba(255,200,0,0.3);">${r.confidence}</span>`
+                            : `<span class="result-badge badge-safe">✅ 安全</span>`;
+                        const div = document.createElement('div');
+                        div.className = 'result-item' + (isFall ? ' fall-detected' : '');
+                        div.innerHTML = `
+                            <div class="result-header">
+                                <div class="result-filename">${badge} ${r.filename}</div>
+                                <div class="result-timestamp">${r.timestamp || r.created_at}</div>
+                            </div>
+                            <div class="result-content">${r.description}</div>`;
+                        list.appendChild(div);
+                    });
+                }
+            } catch (err) { console.error('Load results error:', err); }
+        }
+
+        /* === 事件歷史 === */
+        async function loadHistory() {
+            try {
+                const res = await fetch('/api/results');
+                const data = await safeJson(res);
+                if (!data.success) return;
+
+                const events = data.results;
+                const tbody = document.getElementById('eventTableBody');
+                tbody.innerHTML = '';
+
+                let falls = 0, notified = 0;
+                events.forEach(e => {
+                    if (e.fall_detected) falls++;
+                    if (e.notified) notified++;
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${e.timestamp || e.created_at}</td>
+                        <td>${e.filename}</td>
+                        <td>${e.fall_detected ? '<span style="color:#ff0066">🚨 是</span>' : '<span style="color:#00ff88">✅ 否</span>'}</td>
+                        <td>${e.confidence || '-'}</td>
+                        <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(e.description||'').replace(/"/g,'&quot;')}">${e.description || '-'}</td>
+                        <td>${e.notified ? '✅' : '-'}</td>`;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('statTotal').textContent = events.length;
+                document.getElementById('statFalls').textContent = falls;
+                document.getElementById('statSafe').textContent = events.length - falls;
+                document.getElementById('statNotified').textContent = notified;
+
+                if (!events.length) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:rgba(0,255,255,0.5);">尚無事件紀錄</td></tr>';
+                }
+            } catch (err) { console.error('Load history error:', err); }
+        }
+
+        /* === 匯出 & 清除 === */
+        function exportCSV() { window.location.href = '/api/export-csv'; }
+
+        async function clearAll() {
+            if (!confirm('確定要清除所有資料嗎？將刪除所有上傳圖片和辨識結果。')) return;
+            try {
+                const res = await fetch('/api/clear', { method:'POST' });
+                const data = await safeJson(res);
+                if (data.success) {
+                    uploadedFiles = []; fileObjects = [];
+                    document.getElementById('fileInfo').textContent = '';
+                    document.getElementById('videoInfo').textContent = '';
+                    previewContainer.innerHTML = '';
+                    document.getElementById('videoPreviewContainer').innerHTML = '';
+                    document.getElementById('progressContainer').style.display = 'none';
+                    document.getElementById('resultsContainer').style.display = 'none';
+                    loadHistory();
+                    alert('已清除所有資料');
+                }
+            } catch (err) { alert('清除失敗: ' + err.message); }
+        }
+
+        /* === 頁面載入 === */
+        window.addEventListener('DOMContentLoaded', () => {
+            fetch('/api/health').then(r => safeJson(r))
+                .then(d => console.log('System OK:', d.timestamp))
+                .catch(() => console.warn('Backend not reachable'));
+        });
+    </script>
+</body>
+</html>

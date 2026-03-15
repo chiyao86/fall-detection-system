@@ -1,0 +1,1863 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Vision System - 多媒體辨識系統</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: #0a0e27;
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* 科技感背景動畫 */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.3;
+            background: 
+                linear-gradient(90deg, transparent 0%, rgba(0, 255, 255, 0.1) 50%, transparent 100%),
+                radial-gradient(circle at 20% 50%, rgba(120, 0, 255, 0.2) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(0, 255, 255, 0.2) 0%, transparent 50%);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.5; }
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 255, 0.03) 2px,
+                rgba(0, 255, 255, 0.03) 4px
+            );
+            animation: pulse 4s ease-in-out infinite;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        .logo {
+            font-size: 3em;
+            background: linear-gradient(135deg, #00ffff, #7000ff, #ff00ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 900;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            animation: glow 3s ease-in-out infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { filter: drop-shadow(0 0 10px rgba(0, 255, 255, 0.5)); }
+            50% { filter: drop-shadow(0 0 20px rgba(0, 255, 255, 0.8)); }
+        }
+
+        .subtitle {
+            color: #00ffff;
+            font-size: 1.1em;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            opacity: 0.8;
+        }
+
+        /* 標籤頁導航 */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            background: rgba(15, 23, 42, 0.6);
+            padding: 10px;
+            border-radius: 15px;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 15px 20px;
+            background: rgba(10, 14, 39, 0.6);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 10px;
+            color: #00ffff;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .tab-button:hover {
+            background: rgba(0, 255, 255, 0.1);
+            border-color: #00ffff;
+        }
+
+        .tab-button.active {
+            background: linear-gradient(135deg, #00ffff, #7000ff);
+            border-color: #00ffff;
+            color: #ffffff;
+            box-shadow: 0 5px 20px rgba(0, 255, 255, 0.4);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 30px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00ffff, transparent);
+            animation: scan 3s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .card:hover {
+            border-color: rgba(0, 255, 255, 0.5);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(0, 255, 255, 0.2);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+        }
+
+        .card-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #00ffff, #7000ff);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            box-shadow: 0 5px 15px rgba(0, 255, 255, 0.3);
+        }
+
+        .card-title {
+            color: #00ffff;
+            font-size: 1.4em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            color: #00ffff;
+            font-weight: 600;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 15px;
+            background: rgba(10, 14, 39, 0.6);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 10px;
+            color: #ffffff;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-family: 'Consolas', monospace;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #00ffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+            background: rgba(10, 14, 39, 0.8);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .file-upload {
+            border: 2px dashed rgba(0, 255, 255, 0.3);
+            border-radius: 15px;
+            padding: 50px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(10, 14, 39, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .file-upload:hover {
+            border-color: #00ffff;
+            background: rgba(0, 255, 255, 0.05);
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
+        }
+
+        .file-upload.dragover {
+            border-color: #ff00ff;
+            background: rgba(255, 0, 255, 0.05);
+            box-shadow: 0 0 40px rgba(255, 0, 255, 0.3);
+        }
+
+        #fileInput, #videoInput {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .upload-text {
+            font-size: 1.3em;
+            color: #00ffff;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .upload-subtext {
+            color: rgba(0, 255, 255, 0.6);
+            font-size: 0.9em;
+        }
+
+        .file-info {
+            color: #00ff00;
+            margin-top: 20px;
+            font-weight: 600;
+            font-size: 1.1em;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+        /* 攝像頭預覽 */
+        .camera-preview {
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto 20px;
+            border-radius: 15px;
+            overflow: hidden;
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            background: #000;
+            display: none;
+        }
+
+        .camera-preview video {
+            width: 100%;
+            display: block;
+        }
+
+        .camera-status {
+            text-align: center;
+            padding: 15px;
+            background: rgba(0, 255, 255, 0.1);
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+        }
+
+        .camera-status.recording {
+            background: rgba(255, 0, 102, 0.1);
+            border-color: rgba(255, 0, 102, 0.5);
+        }
+
+        .camera-status-text {
+            color: #00ffff;
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .camera-status.recording .camera-status-text {
+            color: #ff0066;
+        }
+
+        .recording-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background: #ff0066;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .preview-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .preview-item {
+            position: relative;
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
+            background: rgba(10, 14, 39, 0.6);
+            transition: all 0.3s;
+        }
+
+        .preview-item:hover {
+            border-color: #00ffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+        }
+
+        .preview-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .preview-info {
+            padding: 10px;
+            color: #00ffff;
+            font-size: 0.8em;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .preview-remove {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(255, 0, 102, 0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            z-index: 10;
+        }
+
+        .preview-remove:hover {
+            background: #ff0066;
+            transform: scale(1.1);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: rgba(0, 255, 255, 0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .checkbox-group:hover {
+            background: rgba(0, 255, 255, 0.1);
+            border-color: rgba(0, 255, 255, 0.4);
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            accent-color: #00ffff;
+        }
+
+        .checkbox-group label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .btn {
+            padding: 18px 40px;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            justify-content: center;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transition: width 0.6s, height 0.6s;
+            pointer-events: none;
+        }
+
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00ffff, #7000ff);
+            color: #ffffff;
+            width: 100%;
+            font-size: 1.3em;
+            box-shadow: 0 10px 30px rgba(0, 255, 255, 0.3);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(0, 255, 255, 0.5);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: rgba(108, 117, 125, 0.3);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(108, 117, 125, 0.5);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #00ff88, #00ffff);
+            color: #0a0e27;
+            border: none;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff0066, #ff00ff);
+            color: #ffffff;
+            border: none;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255, 0, 102, 0.4);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .progress-container {
+            display: none;
+            margin-top: 40px;
+            padding: 35px;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 255, 255, 0.2);
+        }
+
+        .progress-title {
+            color: #00ffff;
+            font-size: 1.3em;
+            font-weight: 700;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 40px;
+            background: rgba(10, 14, 39, 0.6);
+            border-radius: 20px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ffff, #7000ff, #ff00ff);
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1em;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .progress-info {
+            text-align: center;
+            color: #00ffff;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+
+        .results-container {
+            display: none;
+            margin-top: 40px;
+        }
+
+        .result-item {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            margin-bottom: 20px;
+            border-radius: 15px;
+            border-left: 4px solid #00ffff;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s;
+        }
+
+        .result-item:hover {
+            border-color: rgba(0, 255, 255, 0.5);
+            transform: translateX(5px);
+            box-shadow: 0 8px 30px rgba(0, 255, 255, 0.2);
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+        }
+
+        .result-filename {
+            font-weight: 700;
+            color: #00ffff;
+            font-size: 1.1em;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+
+        .result-timestamp {
+            color: rgba(0, 255, 255, 0.7);
+            font-size: 0.9em;
+            font-family: 'Consolas', monospace;
+        }
+
+        .result-content {
+            color: #ffffff;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            font-size: 0.95em;
+        }
+
+        .collapsible-section {
+            margin-bottom: 20px;
+        }
+
+        .collapsible-header {
+            cursor: pointer;
+            padding: 15px;
+            background: rgba(0, 255, 255, 0.05);
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+        }
+
+        .collapsible-header:hover {
+            background: rgba(0, 255, 255, 0.1);
+            border-color: rgba(0, 255, 255, 0.4);
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            padding: 0 15px;
+        }
+
+        .collapsible-content.active {
+            max-height: 2000px;
+            padding: 20px 15px;
+        }
+
+        .info-box {
+            background: rgba(0, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            color: rgba(0, 255, 255, 0.8);
+            line-height: 1.8;
+        }
+
+        .arrow {
+            color: #00ffff;
+            font-size: 1.2em;
+            transition: transform 0.3s;
+        }
+
+        .arrow.active {
+            transform: rotate(180deg);
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .tabs {
+                flex-direction: column;
+            }
+
+            .tab-button {
+                width: 100%;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+    
+    <div class="container">
+        <div class="header">
+            <div class="logo">⚡ AI VISION ⚡</div>
+            <div class="subtitle">Advanced Multimedia Recognition System</div>
+        </div>
+
+        <!-- 標籤頁導航 -->
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('image')">
+                <span>📁</span> 圖片上傳
+            </button>
+            <button class="tab-button" onclick="switchTab('video')">
+                <span>🎬</span> 影片上傳
+            </button>
+            <button class="tab-button" onclick="switchTab('camera')">
+                <span>📷</span> 攝像頭錄影
+            </button>
+        </div>
+
+        <!-- API 設定區 (共用) -->
+        <div class="grid">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">🔑</div>
+                    <div class="card-title">API Configuration</div>
+                </div>
+                <div class="input-group">
+                    <label for="apiKey">Groq API Key *</label>
+                    <input type="text" id="apiKey" placeholder="Enter your Groq API key...">
+                </div>
+                <div class="input-group">
+                    <label for="prompt">Recognition Prompt *</label>
+                    <textarea id="prompt" placeholder="Define your recognition parameters...">請詳細描述這張圖片的內容，包括所有可見的物體、文字、顏色、位置等資訊。</textarea>
+                </div>
+            </div>
+
+            <!-- 標籤頁內容區 -->
+            <div class="card">
+                <!-- 圖片上傳標籤 -->
+                <div id="tab-image" class="tab-content active">
+                    <div class="card-header">
+                        <div class="card-icon">📤</div>
+                        <div class="card-title">Image Upload</div>
+                    </div>
+                    <div class="file-upload" id="dropZoneImage">
+                        <div class="upload-icon">🖼️</div>
+                        <div class="upload-text">拖曳檔案或點擊上傳</div>
+                        <div class="upload-subtext">支援多選 • PNG • JPG • JPEG • GIF • BMP</div>
+                        <input type="file" id="fileInput" multiple accept="image/*">
+                        <div class="file-info" id="fileInfo"></div>
+                    </div>
+                    <div class="preview-container" id="previewContainer"></div>
+                </div>
+
+                <!-- 影片上傳標籤 -->
+                <div id="tab-video" class="tab-content">
+                    <div class="card-header">
+                        <div class="card-icon">🎬</div>
+                        <div class="card-title">Video Upload</div>
+                    </div>
+                    <div class="input-group">
+                        <label for="frameInterval">拆幀間隔 (秒)</label>
+                        <input type="number" id="frameInterval" value="3" min="1" max="60" placeholder="每 N 秒提取一幀">
+                    </div>
+                    <div class="file-upload" id="dropZoneVideo">
+                        <div class="upload-icon">🎞️</div>
+                        <div class="upload-text">拖曳影片或點擊上傳</div>
+                        <div class="upload-subtext">支援 MP4 • AVI • MOV • MKV • WEBM</div>
+                        <input type="file" id="videoInput" multiple accept="video/*">
+                        <div class="file-info" id="videoInfo"></div>
+                    </div>
+                    <div class="preview-container" id="videoPreviewContainer"></div>
+                </div>
+
+                <!-- 攝像頭錄影標籤 -->
+                <div id="tab-camera" class="tab-content">
+                    <div class="card-header">
+                        <div class="card-icon">📷</div>
+                        <div class="card-title">Camera Recording</div>
+                    </div>
+                    
+                    <div class="camera-status" id="cameraStatus">
+                        <div class="camera-status-text">攝像頭未啟動</div>
+                        <div id="cameraDebugInfo" style="font-size: 0.85em; color: rgba(0, 255, 255, 0.6); margin-top: 10px; text-align: left; padding: 10px; display: none;">
+                            <strong>診斷信息：</strong><br>
+                            <span id="debugDetails"></span>
+                        </div>
+                        <div id="cameraHelp" style="display: none; margin-top: 15px; padding: 15px; background: rgba(255, 152, 0, 0.1); border: 1px solid rgba(255, 152, 0, 0.3); border-radius: 10px; text-align: left;">
+                            <strong style="color: #ff9800; font-size: 1.1em;">🔓 解除 Chrome 攝像頭封鎖步驟：</strong>
+                            <ol style="margin: 10px 0; padding-left: 20px; color: #ffffff; line-height: 2;">
+                                <li>點擊網址列<strong>左側的鎖頭圖示 🔒</strong>（或攝像頭圖示）</li>
+                                <li>找到「<strong>攝像頭</strong>」或「<strong>Camera</strong>」選項</li>
+                                <li>將設定改為「<strong>允許</strong>」或「<strong>Allow</strong>」</li>
+                                <li>重新整理頁面（按 F5）</li>
+                                <li>再次點擊「開啟攝像頭」按鈕</li>
+                            </ol>
+                            <div style="padding: 10px; background: rgba(0, 0, 0, 0.3); border-radius: 5px; margin-top: 10px;">
+                                <strong style="color: #00ffff;">💡 提示：</strong><br>
+                                <span style="color: #ffffff;">如果沒看到設定選項，請確保使用 <strong>http://localhost:5000</strong> 或 <strong>http://127.0.0.1:5000</strong> 訪問</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="camera-preview" id="cameraPreview">
+                        <video id="cameraVideo" autoplay playsinline muted></video>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="captureInterval">拍攝間隔 (秒)</label>
+                        <input type="number" id="captureInterval" value="0.5" min="0.1" max="10" step="0.1" 
+                               style="background: rgba(0, 255, 255, 0.1); border: 1px solid rgba(0, 255, 255, 0.3); 
+                                      color: #ffffff; padding: 12px; border-radius: 8px; font-size: 1em;">
+                        <small style="color: rgba(255, 255, 255, 0.6); display: block; margin-top: 5px;">
+                            建議 0.5-2 秒，數值越小拍攝越頻繁
+                        </small>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="groupSize">每組圖片數量 (最多 5 張)</label>
+                        <input type="number" id="groupSize" value="5" min="2" max="5" step="1" 
+                               style="background: rgba(0, 255, 255, 0.1); border: 1px solid rgba(0, 255, 255, 0.3); 
+                                      color: #ffffff; padding: 12px; border-radius: 8px; font-size: 1em;">
+                        <small style="color: rgba(255, 152, 0, 0.9); display: block; margin-top: 5px;">
+                            ⚠️ API 限制：單次最多分析 5 張圖片
+                        </small>
+                    </div>
+
+                    <div class="input-group" style="background: rgba(0, 255, 255, 0.1); padding: 15px; border-radius: 10px; border: 1px solid rgba(0, 255, 255, 0.3);">
+                        <div style="color: #00ffff; font-size: 0.9em; margin-bottom: 10px;">
+                            💡 <strong>說明</strong>：點擊「開始錄影」後持續拍攝，手動點「停止錄影」結束
+                        </div>
+                        <div style="color: rgba(255, 255, 255, 0.8); font-size: 0.85em;">
+                            例如：間隔 0.5秒、每組 5張 → 每 2.5秒為一組，分析該組內發生了什麼
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn btn-secondary" id="diagnoseCameraBtn" onclick="diagnoseCamera()" style="flex: 0 1 auto;">
+                            <span>🔍</span> 診斷
+                        </button>
+                        <button class="btn btn-success" id="startCameraBtn" onclick="startCamera()">
+                            <span>📷</span> 開啟攝像頭
+                        </button>
+                        <button class="btn btn-secondary" id="startRecordingBtn" onclick="startRecording()" disabled>
+                            <span>🔴</span> 開始錄影
+                        </button>
+                        <button class="btn btn-danger" id="stopRecordingBtn" onclick="stopRecording()" disabled>
+                            <span>⏹️</span> 停止錄影
+                        </button>
+                    </div>
+
+                    <div class="preview-container" id="cameraPreviewContainer"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 通知設定區 (共用) -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon">🔔</div>
+                <div class="card-title">Notification Settings</div>
+            </div>
+            
+            <!-- Google Sheets -->
+            <div class="collapsible-section">
+                <div class="collapsible-header" onclick="toggleSection('googleSheets')">
+                    <div class="checkbox-group" style="margin: 0; padding: 0; background: none; border: none;">
+                        <input type="checkbox" id="googleSheetsEnabled" checked>
+                        <label for="googleSheetsEnabled">啟用 Google Sheets 儲存</label>
+                    </div>
+                    <span class="arrow" id="googleSheetsArrow">▼</span>
+                </div>
+                <div class="collapsible-content" id="googleSheetsContent">
+                    <div class="info-box">
+                        ✅ 已設定 Google Sheets<br>
+                        📊 試算表 ID: 1rZ_557DFPdlmVaDEn4zYubb-ejntHunPfHG1QiXEjDo<br>
+                        🔑 服務帳戶金鑰: key.json
+                    </div>
+                </div>
+            </div>
+
+            <!-- SMS 通知 -->
+            <div class="collapsible-section">
+                <div class="collapsible-header" onclick="toggleSection('sms')">
+                    <div class="checkbox-group" style="margin: 0; padding: 0; background: none; border: none;">
+                        <input type="checkbox" id="smsEnabled">
+                        <label for="smsEnabled">啟用 SMS 簡訊通知</label>
+                    </div>
+                    <span class="arrow" id="smsArrow">▼</span>
+                </div>
+                <div class="collapsible-content" id="smsContent">
+                    <div class="input-group">
+                        <label for="twilioSid">Twilio Account SID</label>
+                        <input type="text" id="twilioSid" placeholder="ACxxxxxxxxxxxxx">
+                    </div>
+                    <div class="input-group">
+                        <label for="twilioToken">Twilio Auth Token</label>
+                        <input type="text" id="twilioToken" placeholder="xxxxxxxxxxxxxxxx">
+                    </div>
+                    <div class="input-group">
+                        <label for="twilioFrom">Twilio 寄件號碼</label>
+                        <input type="text" id="twilioFrom" placeholder="+1234567890">
+                    </div>
+                    <div class="input-group">
+                        <label for="twilioTo">接收號碼</label>
+                        <input type="text" id="twilioTo" placeholder="+886912345678">
+                    </div>
+                </div>
+            </div>
+
+            <!-- LINE 通知 -->
+            <div class="collapsible-section">
+                <div class="collapsible-header" onclick="toggleSection('line')">
+                    <div class="checkbox-group" style="margin: 0; padding: 0; background: none; border: none;">
+                        <input type="checkbox" id="lineEnabled">
+                        <label for="lineEnabled">啟用 LINE 訊息通知</label>
+                    </div>
+                    <span class="arrow" id="lineArrow">▼</span>
+                </div>
+                <div class="collapsible-content" id="lineContent">
+                    <div class="input-group">
+                        <label for="lineToken">LINE Channel Access Token</label>
+                        <input type="text" id="lineToken" placeholder="xxxxxxxxxxxxxxxx">
+                    </div>
+                    <div class="input-group">
+                        <label for="lineUserId">LINE User ID</label>
+                        <input type="text" id="lineUserId" placeholder="Uxxxxxxxxxxxxxxxx">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作按鈕 -->
+        <button class="btn btn-primary" id="analyzeBtn" onclick="startAnalysis()">
+            <span>⚡</span>
+            Initialize Recognition
+        </button>
+
+        <!-- 進度顯示 -->
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-title">⚙️ Processing Status</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%">0%</div>
+            </div>
+            <div class="progress-info" id="progressInfo">Initializing...</div>
+        </div>
+
+        <!-- 結果顯示 -->
+        <div class="results-container" id="resultsContainer">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">📊</div>
+                    <div class="card-title">Recognition Results</div>
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-success" onclick="exportCSV()">
+                        <span>📥</span>
+                        Export CSV
+                    </button>
+                    <button class="btn btn-danger" onclick="clearAll()">
+                        <span>🗑️</span>
+                        Clear All
+                    </button>
+                </div>
+                <div id="resultsList" style="margin-top: 30px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let uploadedFiles = [];
+        let fileObjects = [];
+        let cameraStream = null;
+        let recordingInterval = null;
+        let captureCount = 0;
+        let currentRecordingSession = null;
+        let recordingSessionFiles = [];
+        let recordingGroups = [];
+
+        // 標籤頁切換
+        function switchTab(tabName) {
+            // 更新按鈕狀態
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.closest('.tab-button').classList.add('active');
+
+            // 更新內容顯示
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById('tab-' + tabName).classList.add('active');
+        }
+
+        // 圖片壓縮函數
+        async function compressImage(file, maxWidth = 1920, quality = 0.8) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > maxWidth) {
+                            height = (height * maxWidth) / width;
+                            width = maxWidth;
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        canvas.toBlob((blob) => {
+                            resolve(new File([blob], file.name, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now()
+                            }));
+                        }, 'image/jpeg', quality);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // 圖片上傳處理
+        const dropZoneImage = document.getElementById('dropZoneImage');
+        const fileInput = document.getElementById('fileInput');
+        const previewContainer = document.getElementById('previewContainer');
+
+        dropZoneImage.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fileInput.click();
+        });
+
+        dropZoneImage.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZoneImage.classList.add('dragover');
+        });
+
+        dropZoneImage.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZoneImage.classList.remove('dragover');
+        });
+
+        dropZoneImage.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZoneImage.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        async function handleFiles(files) {
+            const newFiles = Array.from(files);
+            
+            // 壓縮圖片並分批上傳
+            for (let i = 0; i < newFiles.length; i += 5) {
+                const batch = newFiles.slice(i, i + 5);
+                await uploadBatch(batch);
+            }
+        }
+
+        async function uploadBatch(files) {
+            const formData = new FormData();
+            
+            // 壓縮圖片
+            for (let file of files) {
+                const compressed = await compressImage(file);
+                formData.append('files[]', compressed);
+                fileObjects.push(compressed);
+            }
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    uploadedFiles = uploadedFiles.concat(data.files);
+                    updateFileInfo();
+                    displayPreviews();
+                }
+            } catch (error) {
+                alert('上傳失敗: ' + error.message);
+            }
+        }
+
+        function updateFileInfo() {
+            const totalSize = fileObjects.reduce((sum, file) => sum + file.size, 0);
+            const sizeInMB = (totalSize / (1024 * 1024)).toFixed(2);
+            document.getElementById('fileInfo').textContent = 
+                `✅ 已選擇 ${uploadedFiles.length} 個檔案 (總大小: ${sizeInMB} MB)`;
+        }
+
+        function displayPreviews() {
+            previewContainer.innerHTML = '';
+            
+            fileObjects.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    div.innerHTML = `
+                        <img src="${e.target.result}" alt="${file.name}">
+                        <div class="preview-info">${file.name}</div>
+                        <button class="preview-remove" onclick="removeFile(${index})">×</button>
+                    `;
+                    previewContainer.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function removeFile(index) {
+            fileObjects.splice(index, 1);
+            uploadedFiles.splice(index, 1);
+            updateFileInfo();
+            displayPreviews();
+            
+            if (uploadedFiles.length === 0) {
+                document.getElementById('fileInfo').textContent = '';
+            }
+        }
+
+        // 影片上傳處理
+        const dropZoneVideo = document.getElementById('dropZoneVideo');
+        const videoInput = document.getElementById('videoInput');
+        const videoPreviewContainer = document.getElementById('videoPreviewContainer');
+
+        dropZoneVideo.addEventListener('click', (e) => {
+            e.stopPropagation();
+            videoInput.click();
+        });
+
+        dropZoneVideo.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZoneVideo.classList.add('dragover');
+        });
+
+        dropZoneVideo.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZoneVideo.classList.remove('dragover');
+        });
+
+        dropZoneVideo.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZoneVideo.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            handleVideoFiles(files);
+        });
+
+        videoInput.addEventListener('change', (e) => {
+            handleVideoFiles(e.target.files);
+        });
+
+        async function handleVideoFiles(files) {
+            const formData = new FormData();
+            const interval = document.getElementById('frameInterval').value;
+            formData.append('interval', interval);
+            
+            for (let file of files) {
+                formData.append('files[]', file);
+            }
+
+            try {
+                document.getElementById('videoInfo').textContent = '⏳ 正在處理影片...';
+                
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    uploadedFiles = uploadedFiles.concat(data.files);
+                    document.getElementById('videoInfo').textContent = 
+                        `✅ 已提取 ${data.count} 個影片幀`;
+                    
+                    // 顯示影片幀預覽
+                    displayVideoFrames(data.files);
+                }
+            } catch (error) {
+                alert('影片處理失敗: ' + error.message);
+                document.getElementById('videoInfo').textContent = '';
+            }
+        }
+
+        function displayVideoFrames(frames) {
+            videoPreviewContainer.innerHTML = '';
+            frames.forEach((frame, index) => {
+                const div = document.createElement('div');
+                div.className = 'preview-item';
+                div.innerHTML = `
+                    <div style="width: 150px; height: 150px; background: rgba(0, 255, 255, 0.1); display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: 3em;">🎞️</span>
+                    </div>
+                    <div class="preview-info">${frame.original_name}</div>
+                `;
+                videoPreviewContainer.appendChild(div);
+            });
+        }
+
+        // 攝像頭診斷功能
+        async function diagnoseCamera() {
+            const debugInfo = document.getElementById('cameraDebugInfo');
+            const debugDetails = document.getElementById('debugDetails');
+            const helpSection = document.getElementById('cameraHelp');
+            debugInfo.style.display = 'block';
+            helpSection.style.display = 'none';
+            
+            let info = [];
+            let needsHelp = false;
+            
+            // 1. 檢查當前網址
+            const currentUrl = window.location.href;
+            info.push(`📍 當前網址: ${currentUrl}`);
+            
+            // 2. 檢查是否為安全上下文
+            const isSecure = window.isSecureContext;
+            if (isSecure) {
+                info.push(`✅ 安全上下文: 是 (支援攝像頭)`);
+            } else {
+                info.push(`❌ 安全上下文: 否 (需要 HTTPS 或 localhost)`);
+                info.push(`   → 請改用: http://localhost:5000 或 http://127.0.0.1:5000`);
+                needsHelp = true;
+            }
+            
+            // 3. 檢查 navigator.mediaDevices
+            if (navigator.mediaDevices) {
+                info.push(`✅ mediaDevices API: 支援`);
+            } else {
+                info.push(`❌ mediaDevices API: 不支援`);
+                needsHelp = true;
+            }
+            
+            // 4. 檢查 getUserMedia
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                info.push(`✅ getUserMedia: 支援`);
+            } else {
+                info.push(`❌ getUserMedia: 不支援`);
+                needsHelp = true;
+            }
+            
+            // 5. 檢查權限狀態
+            if (navigator.permissions && navigator.permissions.query) {
+                try {
+                    const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+                    if (permissionStatus.state === 'granted') {
+                        info.push(`✅ 攝像頭權限: 已授予`);
+                    } else if (permissionStatus.state === 'denied') {
+                        info.push(`❌ 攝像頭權限: <strong style="color: #ff0066;">已被封鎖/拒絕</strong>`);
+                        needsHelp = true;
+                    } else {
+                        info.push(`⚠️ 攝像頭權限: 尚未詢問`);
+                    }
+                } catch (err) {
+                    info.push(`⚠️ 無法查詢權限狀態: ${err.message}`);
+                }
+            }
+            
+            // 6. 嘗試列舉設備
+            if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videoDevices = devices.filter(d => d.kind === 'videoinput');
+                    if (videoDevices.length > 0) {
+                        info.push(`✅ 找到 ${videoDevices.length} 個攝像頭設備`);
+                        videoDevices.forEach((device, i) => {
+                            info.push(`   ${i + 1}. ${device.label || '攝像頭 ' + (i + 1)}`);
+                        });
+                    } else {
+                        info.push(`❌ 找不到攝像頭設備`);
+                    }
+                } catch (err) {
+                    info.push(`⚠️ 無法列舉設備: ${err.message}`);
+                }
+            }
+            
+            // 7. 瀏覽器信息
+            const browserInfo = navigator.userAgent.match(/(Chrome|Firefox|Safari|Edge)\/[\d.]+/);
+            info.push(`🌐 瀏覽器: ${browserInfo ? browserInfo[0] : 'Unknown'}`);
+            
+            // 8. 協議檢查
+            if (window.location.protocol === 'http:' && 
+                window.location.hostname !== 'localhost' && 
+                window.location.hostname !== '127.0.0.1') {
+                info.push(`<br><strong style="color: #ff9800;">⚠️ 重要提示：</strong>`);
+                info.push(`您正在使用非安全連線訪問。`);
+                info.push(`請在瀏覽器中訪問: <strong>http://localhost:5000</strong>`);
+                info.push(`或 <strong>http://127.0.0.1:5000</strong>`);
+                needsHelp = true;
+            }
+            
+            debugDetails.innerHTML = info.join('<br>');
+            
+            // 如果需要幫助，顯示解決步驟
+            if (needsHelp) {
+                helpSection.style.display = 'block';
+            }
+            
+            // 更新狀態文字
+            document.getElementById('cameraStatus').querySelector('.camera-status-text').textContent = 
+                needsHelp ? '⚠️ 發現問題 - 請查看解決步驟' : '🔍 診斷完成 - 一切正常';
+        }
+
+        // 攝像頭功能
+        async function startCamera() {
+            try {
+                // 先運行診斷
+                document.getElementById('cameraDebugInfo').style.display = 'none';
+                
+                // 檢查瀏覽器是否支援
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    await diagnoseCamera();
+                    alert('❌ 瀏覽器不支援攝像頭功能\n\n請點擊「診斷」按鈕查看詳細信息。\n\n建議解決方案：\n1. 使用最新版本的 Chrome、Firefox、Edge 或 Safari\n2. 確保使用 http://localhost:5000 訪問（不要用 IP 地址）');
+                    return;
+                }
+
+                // 檢查安全上下文
+                if (!window.isSecureContext && 
+                    window.location.hostname !== 'localhost' && 
+                    window.location.hostname !== '127.0.0.1') {
+                    await diagnoseCamera();
+                    const correctUrl = window.location.href.replace(window.location.hostname, 'localhost');
+                    alert(`❌ 安全性限制：攝像頭需要安全連線\n\n您目前的網址：\n${window.location.href}\n\n請改用以下網址訪問：\n${correctUrl}\n\n或複製此網址到瀏覽器：\nhttp://localhost:5000`);
+                    return;
+                }
+
+                // 請求攝像頭權限
+                document.getElementById('cameraStatus').querySelector('.camera-status-text').textContent = 
+                    '⏳ 正在啟動攝像頭...';
+                
+                cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'user'
+                    } 
+                });
+                
+                const video = document.getElementById('cameraVideo');
+                video.srcObject = cameraStream;
+                
+                document.getElementById('cameraPreview').style.display = 'block';
+                document.getElementById('cameraDebugInfo').style.display = 'none';
+                document.getElementById('cameraStatus').querySelector('.camera-status-text').textContent = 
+                    '✅ 攝像頭已啟動';
+                
+                document.getElementById('startCameraBtn').disabled = true;
+                document.getElementById('startRecordingBtn').disabled = false;
+            } catch (error) {
+                console.error('攝像頭錯誤:', error);
+                let errorMessage = '無法啟動攝像頭';
+                let showHelp = false;
+                
+                if (error.name === 'NotAllowedError') {
+                    errorMessage = '❌ 攝像頭權限被封鎖或拒絕';
+                    showHelp = true;
+                    // 顯示解決步驟
+                    document.getElementById('cameraHelp').style.display = 'block';
+                    document.getElementById('cameraStatus').querySelector('.camera-status-text').innerHTML = 
+                        '❌ 攝像頭權限被 Chrome 封鎖<br><small style="color: #ff9800;">請查看下方解決步驟 ↓</small>';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage = '找不到攝像頭設備。請確認您的電腦有連接攝像頭。';
+                } else if (error.name === 'NotReadableError') {
+                    errorMessage = '攝像頭正在被其他應用程式使用。請關閉其他使用攝像頭的程式（如 Zoom、Teams、Skype 等）。';
+                } else if (error.name === 'OverconstrainedError') {
+                    errorMessage = '無法滿足攝像頭設定要求。將使用預設設定重試...';
+                    // 重試使用基本設定
+                    try {
+                        cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                        const video = document.getElementById('cameraVideo');
+                        video.srcObject = cameraStream;
+                        document.getElementById('cameraPreview').style.display = 'block';
+                        document.getElementById('cameraHelp').style.display = 'none';
+                        document.getElementById('cameraStatus').querySelector('.camera-status-text').textContent = 
+                            '✅ 攝像頭已啟動（使用預設設定）';
+                        document.getElementById('startCameraBtn').disabled = true;
+                        document.getElementById('startRecordingBtn').disabled = false;
+                        return;
+                    } catch (retryError) {
+                        errorMessage = '無法啟動攝像頭: ' + retryError.message;
+                    }
+                } else if (error.name === 'SecurityError') {
+                    errorMessage = '安全性錯誤：請使用 HTTPS 連線或 localhost。\n當前網址: ' + window.location.protocol + '//' + window.location.host;
+                    showHelp = true;
+                } else {
+                    errorMessage = '無法啟動攝像頭: ' + error.message;
+                }
+                
+                if (!showHelp) {
+                    alert(errorMessage);
+                }
+            }
+        }
+
+        function startRecording() {
+            const intervalSec = parseFloat(document.getElementById('captureInterval').value);
+            
+            if (isNaN(intervalSec) || intervalSec <= 0) {
+                alert('請輸入有效的拍攝間隔（大於 0）');
+                return;
+            }
+            
+            const groupSize = parseInt(document.getElementById('groupSize').value);
+            if (isNaN(groupSize) || groupSize < 1) {
+                alert('請輸入有效的每組圖片數量（至少 1 張）');
+                return;
+            }
+            
+            const intervalMs = intervalSec * 1000;
+            
+            captureCount = 0;
+            recordingSessionFiles = [];
+            recordingGroups = [];
+            currentRecordingSession = `session_${Date.now()}`;
+            
+            document.getElementById('cameraStatus').classList.add('recording');
+            document.getElementById('cameraStatus').querySelector('.camera-status-text').innerHTML = 
+                `<span class="recording-indicator"></span>錄影中 - 已拍攝: 0 張 (每 ${groupSize} 張一組)`;
+            
+            document.getElementById('startRecordingBtn').disabled = true;
+            document.getElementById('stopRecordingBtn').disabled = false;
+            
+            // 立即拍攝第一張
+            captureFrame();
+            
+            // 持續定時拍攝（不自動停止）
+            recordingInterval = setInterval(() => {
+                captureFrame();
+            }, intervalMs);
+        }
+
+        function stopRecording() {
+            if (recordingInterval) {
+                clearInterval(recordingInterval);
+                recordingInterval = null;
+            }
+            
+            finishRecording();
+        }
+
+        function finishRecording() {
+            const groupSize = parseInt(document.getElementById('groupSize').value);
+            const totalGroups = Math.ceil(captureCount / groupSize);
+            
+            document.getElementById('cameraStatus').classList.remove('recording');
+            document.getElementById('cameraStatus').querySelector('.camera-status-text').innerHTML = 
+                `✅ 錄製完成！共拍攝 ${captureCount} 張<br><small style="color: #00ffff;">將分為 ${totalGroups} 組進行分析（每組 ${groupSize} 張）</small>`;
+            
+            document.getElementById('startRecordingBtn').disabled = false;
+            document.getElementById('stopRecordingBtn').disabled = true;
+            
+            // 將錄製的圖片按組分組
+            if (recordingSessionFiles.length > 0) {
+                recordingGroups = [];
+                for (let i = 0; i < recordingSessionFiles.length; i += groupSize) {
+                    const group = recordingSessionFiles.slice(i, i + groupSize);
+                    recordingGroups.push({
+                        groupId: `group_${Math.floor(i / groupSize) + 1}`,
+                        files: group,
+                        startIndex: i,
+                        endIndex: Math.min(i + groupSize, recordingSessionFiles.length)
+                    });
+                }
+                console.log(`錄製完成: ${recordingSessionFiles.length} 張圖片，分為 ${recordingGroups.length} 組`);
+            }
+            
+            currentRecordingSession = null;
+        }
+
+        async function captureFrame() {
+            const video = document.getElementById('cameraVideo');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            canvas.toBlob(async (blob) => {
+                const timestamp = Date.now();
+                const filename = currentRecordingSession ? 
+                    `${currentRecordingSession}_frame_${captureCount.toString().padStart(4, '0')}.jpg` : 
+                    `camera_${timestamp}.jpg`;
+                
+                const file = new File([blob], filename, {
+                    type: 'image/jpeg'
+                });
+                
+                // 上傳到伺服器
+                const formData = new FormData();
+                formData.append('files[]', file);
+                
+                try {
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        uploadedFiles = uploadedFiles.concat(data.files);
+                        
+                        // 將此幀添加到當前錄製會話
+                        if (currentRecordingSession) {
+                            recordingSessionFiles.push(data.files[0]);
+                        }
+                        
+                        captureCount++;
+                        
+                        // 更新錄影狀態（如果還在錄影中）
+                        const statusElement = document.getElementById('cameraStatus').querySelector('.camera-status-text');
+                        if (statusElement && statusElement.innerHTML.includes('錄影中')) {
+                            const groupSize = parseInt(document.getElementById('groupSize').value);
+                            const completedGroups = Math.floor(captureCount / groupSize);
+                            const currentGroupProgress = captureCount % groupSize;
+                            statusElement.innerHTML = 
+                                `<span class="recording-indicator"></span>錄影中 - 已拍攝: ${captureCount} 張 (完成 ${completedGroups} 組 + ${currentGroupProgress}/${groupSize})`;
+                        }
+                        
+                        // 顯示預覽（只顯示部分以節省空間）
+                        if (captureCount % 5 === 1) {
+                            displayCameraCapture(URL.createObjectURL(blob), data.files[0].original_name);
+                        }
+                    }
+                } catch (error) {
+                    console.error('上傳失敗:', error);
+                }
+            }, 'image/jpeg', 0.85);
+        }
+
+        function displayCameraCapture(imageUrl, filename) {
+            const container = document.getElementById('cameraPreviewContainer');
+            const div = document.createElement('div');
+            div.className = 'preview-item';
+            div.innerHTML = `
+                <img src="${imageUrl}" alt="${filename}">
+                <div class="preview-info">${filename}</div>
+            `;
+            container.insertBefore(div, container.firstChild);
+        }
+
+        function toggleSection(sectionName) {
+            const content = document.getElementById(sectionName + 'Content');
+            const arrow = document.getElementById(sectionName + 'Arrow');
+            
+if (content.classList.contains('active')) {
+                content.classList.remove('active');
+                arrow.classList.remove('active');
+            } else {
+                content.classList.add('active');
+                arrow.classList.add('active');
+            }
+        }
+
+        async function startAnalysis() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const prompt = document.getElementById('prompt').value.trim();
+
+            if (!apiKey) {
+                alert('請輸入 API 金鑰');
+                return;
+            }
+
+            if (!prompt) {
+                alert('請輸入提示詞');
+                return;
+            }
+
+            if (uploadedFiles.length === 0) {
+                alert('請先上傳圖片、影片或使用攝像頭錄影');
+                return;
+            }
+
+            // 檢查是否有錄影分組
+            const hasGroups = recordingGroups.length > 0;
+            let analyzeMode = 'individual';
+            let filesToAnalyze = uploadedFiles;
+            let confirmMessage = `確定要開始辨識 ${uploadedFiles.length} 張圖片嗎？`;
+            
+            if (hasGroups) {
+                // 使用分組模式
+                analyzeMode = 'grouped_sequence';
+                confirmMessage = `確定要開始辨識嗎？\n\n📹 錄影分組模式：\n` +
+                    `- 共 ${recordingGroups.length} 組\n` +
+                    `- 總共 ${uploadedFiles.length} 張圖片\n` +
+                    `- 每組將獨立分析該時間段內的動作`;
+            } else {
+                // 檢查是否為一般的攝像頭錄影序列
+                const hasSessionFiles = uploadedFiles.some(f => f.original_name.includes('session_'));
+                if (hasSessionFiles) {
+                    analyzeMode = 'sequence';
+                    confirmMessage += '\n\n📹 偵測到錄影序列，將以連貫方式分析';
+                }
+            }
+            
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            const requestData = {
+                api_key: apiKey,
+                prompt: prompt,
+                files: filesToAnalyze,
+                analyze_mode: analyzeMode,
+                recording_groups: hasGroups ? recordingGroups : null,
+                google_sheets_enabled: document.getElementById('googleSheetsEnabled').checked,
+                sms_enabled: document.getElementById('smsEnabled').checked,
+                twilio_sid: document.getElementById('twilioSid').value.trim(),
+                twilio_token: document.getElementById('twilioToken').value.trim(),
+                twilio_from: document.getElementById('twilioFrom').value.trim(),
+                twilio_to: document.getElementById('twilioTo').value.trim(),
+                line_enabled: document.getElementById('lineEnabled').checked,
+                line_token: document.getElementById('lineToken').value.trim(),
+                line_user_id: document.getElementById('lineUserId').value.trim()
+            };
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(requestData)
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('progressContainer').style.display = 'block';
+                    document.getElementById('analyzeBtn').disabled = true;
+                    startPolling();
+                } else {
+                    alert('請求失敗: ' + data.error);
+                }
+            } catch (error) {
+                alert('請求失敗: ' + error.message);
+            }
+        }
+
+        let pollingInterval;
+
+        function startPolling() {
+            pollingInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/api/status');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        const status = data.status;
+                        const progress = status.total > 0 ? 
+                            Math.round((status.current / status.total) * 100) : 0;
+                        
+                        document.getElementById('progressFill').style.width = progress + '%';
+                        document.getElementById('progressFill').textContent = progress + '%';
+                        document.getElementById('progressInfo').textContent = 
+                            `處理中: ${status.current} / ${status.total} - ${status.current_file}`;
+                        
+                        if (!status.is_processing && status.current === status.total) {
+                            clearInterval(pollingInterval);
+                            document.getElementById('progressInfo').textContent = '✅ 處理完成！';
+                            document.getElementById('analyzeBtn').disabled = false;
+                            loadResults();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 1000);
+        }
+
+        async function loadResults() {
+            try {
+                const response = await fetch('/api/results');
+                const data = await response.json();
+                
+                if (data.success && data.results.length > 0) {
+                    document.getElementById('resultsContainer').style.display = 'block';
+                    const resultsList = document.getElementById('resultsList');
+                    resultsList.innerHTML = '';
+                    
+                    data.results.forEach(result => {
+                        const div = document.createElement('div');
+                        div.className = 'result-item';
+                        div.innerHTML = `
+                            <div class="result-header">
+                                <div class="result-filename">${result.filename}</div>
+                                <div class="result-timestamp">${result.timestamp}</div>
+                            </div>
+                            <div class="result-content">${result.result}</div>
+                        `;
+                        resultsList.appendChild(div);
+                    });
+                }
+            } catch (error) {
+                console.error('Load results error:', error);
+            }
+        }
+
+        async function exportCSV() {
+            try {
+                window.location.href = '/api/export-csv';
+            } catch (error) {
+                alert('匯出失敗: ' + error.message);
+            }
+        }
+
+        async function clearAll() {
+            if (!confirm('確定要清除所有資料嗎？這將刪除所有上傳的圖片和辨識結果。')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/clear', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    // 清除檔案相關變數
+                    uploadedFiles = [];
+                    fileObjects = [];
+                    
+                    // 清除錄影相關變數
+                    recordingGroups = [];
+                    recordingSessionFiles = [];
+                    currentRecordingSession = null;
+                    captureCount = 0;
+                    
+                    // 停止錄影（如果正在錄影）
+                    if (recordingInterval) {
+                        clearInterval(recordingInterval);
+                        recordingInterval = null;
+                    }
+                    
+                    // 清除 UI 顯示
+                    document.getElementById('fileInfo').textContent = '';
+                    document.getElementById('videoInfo').textContent = '';
+                    previewContainer.innerHTML = '';
+                    videoPreviewContainer.innerHTML = '';
+                    document.getElementById('cameraPreviewContainer').innerHTML = '';
+                    document.getElementById('progressContainer').style.display = 'none';
+                    document.getElementById('resultsContainer').style.display = 'none';
+                    
+                    // 重置攝像頭狀態
+                    const cameraStatus = document.getElementById('cameraStatus');
+                    if (cameraStatus) {
+                        cameraStatus.classList.remove('recording');
+                        cameraStatus.querySelector('.camera-status-text').innerHTML = 
+                            '⏺️ 準備就緒';
+                    }
+                    
+                    // 重置按鈕狀態
+                    document.getElementById('startRecordingBtn').disabled = false;
+                    document.getElementById('stopRecordingBtn').disabled = true;
+                    
+                    alert('已清除所有資料');
+                }
+            } catch (error) {
+                alert('清除失敗: ' + error.message);
+            }
+        }
+
+        // 頁面載入時檢查瀏覽器支援
+        window.addEventListener('DOMContentLoaded', () => {
+            // 檢查攝像頭 API 支援
+            const cameraTabButton = document.querySelector('.tab-button:nth-child(3)');
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                if (cameraTabButton) {
+                    cameraTabButton.style.opacity = '0.5';
+                    cameraTabButton.title = '您的瀏覽器不支援攝像頭功能';
+                }
+                console.warn('瀏覽器不支援 getUserMedia API');
+            }
+            
+            // 檢查是否為安全上下文（HTTPS 或 localhost）
+            const isSecureContext = window.isSecureContext || window.location.protocol === 'https:' || 
+                                    window.location.hostname === 'localhost' || 
+                                    window.location.hostname === '127.0.0.1';
+            
+            if (!isSecureContext) {
+                console.warn('警告：攝像頭功能需要 HTTPS 連線或在 localhost 上運行');
+                const cameraStatus = document.getElementById('cameraStatus');
+                if (cameraStatus) {
+                    cameraStatus.innerHTML = `
+                        <div class="camera-status-text" style="color: #ff9800;">
+                            ⚠️ 攝像頭功能需要 HTTPS 連線<br>
+                            <small>或在 localhost 上運行</small>
+                        </div>
+                    `;
+                }
+            }
+        });
+
+        // 頁面卸載時關閉攝像頭
+        window.addEventListener('beforeunload', () => {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+</html>
