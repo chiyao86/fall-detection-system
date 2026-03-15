@@ -5,6 +5,7 @@ import io
 import json
 import os
 import re
+import time
 
 from PIL import Image
 from groq import Groq
@@ -84,55 +85,118 @@ def analyze_single_image(image_path: str, custom_prompt: str | None = None) -> d
     if not api_key:
         raise ValueError("GROQ_API_KEY 未設定")
 
-    image = Image.open(image_path)
-    b64 = encode_image(image)
-
-    prompt = custom_prompt or FALL_DETECTION_PROMPT
-
-    client = Groq(api_key=api_key)
-    completion = client.chat.completions.create(
-        model=model,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
-                    },
-                ],
-            }
-        ],
-        temperature=0.3,
-        max_completion_tokens=1024,
-        top_p=1,
-        stream=False,
-    )
-
-    raw = completion.choices[0].message.content
-    return _parse_json_response(raw)
-
-
-def analyze_image_sequence(image_paths: list[str], custom_prompt: str | None = None) -> dict:
-    """分析多張連續圖片序列。最多 5 張。"""
-    MAX_IMAGES = 5
-    api_key = current_app.config["GROQ_API_KEY"]
-    model = current_app.config["GROQ_MODEL"]
-
-    if not api_key:
-        raise ValueError("GROQ_API_KEY 未設定")
-
-    paths = image_paths[:MAX_IMAGES]
-
-    image_contents = []
-    for p in paths:
-        if not os.path.exists(p):
-            continue
-        image = Image.open(p)
+    image = None
+    try:
+        image = Image.open(image_path)
         b64 = encode_image(image)
-        image_contents.append(
-            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
+
+        prompt = custom_prompt or FALL_DETECTION_PROMPT
+
+        client = Groq(api_key=api_key)
+        
+        # 重試機制 - 最多重試 3 次
+        max_retries = 3
+        retry_delay = 2  # 秒
+        
+        for attempt in range(max_retries):
+            try:
+                completion = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
+                                },
+                            ],
+                        }
+                    ],
+                    temperature=0.3,
+                    max_completion_tokens=1024,
+                    top_p=1,
+                    stream=False,
+                )
+
+                raw = completion.choices[0].message.content
+                result = _parse_json_response(raw)
+                
+                # 添加延遲，避免速率限制（每次請求後等待）
+                time.sleep(1.5)
+    opened_images = []
+
+    try:
+        image_contents = []
+        for p in paths:
+            if not os.path.exists(p):
+                continue
+            image = Image.open(p)
+            opened_images.append(image)  # 記錄以便後續關閉
+            b64 = encode_image(image)
+            image_contents.append(
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
+            )
+
+        if not image_contents:
+            return {
+                "fall_detected": False,
+                "confidence": "low",
+                "description": "沒有有效的圖片可供分析",
+                "needs_immediate_attention": False,
+            }
+
+        prompt = custom_prompt or (
+            FALL_DETECTION_PROMPT
+            + f"\n\n這是 {len(image_contents)} 張連續圖片，請綜合判斷這段時間內是否有人跌倒。"
+        )
+
+        message_content = [{"type": "text", "text": prompt}]
+        message_content.extend(image_contents)
+
+        client = Groq(api_key=api_key)
+        
+        # 重試機制
+        max_retries = 3
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            try:
+                completion = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": message_content}],
+                    temperature=0.3,
+                    max_completion_tokens=1024,
+                    top_p=1,
+                    stream=False,
+                )
+
+                raw = completion.choices[0].message.content
+                result = _parse_json_response(raw)
+                
+                # 添加延遲
+                time.sleep(2)
+                
+                return result
+                
+            except Exception as e:
+                error_msg = str(e)
+                if "rate_limit" in error_msg.lower() or "429" in error_msg:
+                    if attempt < max_retries - 1:
+                        wait_time = retry_delay * (attempt + 1) * 2
+                        current_app.logger.warning(f"遇到速率限制，等待 {wait_time} 秒後重試...")
+                        time.sleep(wait_time)
+                        continue
+                raise e
+                
+    finally:
+        # 關閉所有開啟的圖片
+        for img in opened_images:
+            try:
+                img.close()
+            except:
+                passmage_url": {"url": f"data:image/jpeg;base64,{b64}"}}
         )
 
     if not image_contents:

@@ -50,6 +50,9 @@ def _save_event(filename: str, image_path: str, result: dict, timestamp_str: str
 def _batch_individual(app, files: list, custom_prompt: str | None, google_sheets: bool):
     """逐張分析（個別模式）"""
     global processing_status
+    success_count = 0
+    failed_count = 0
+    
     try:
         with app.app_context():
             for idx, f_info in enumerate(files):
@@ -59,12 +62,23 @@ def _batch_individual(app, files: list, custom_prompt: str | None, google_sheets
 
                     image_path = f_info["path"]
                     if not os.path.exists(image_path):
+                        current_app.logger.warning(f"檔案不存在，跳過: {image_path}")
+                        failed_count += 1
                         continue
 
+                    current_app.logger.info(f"開始分析 [{idx + 1}/{len(files)}]: {f_info['original_name']}")
                     result = analyze_single_image(image_path, custom_prompt)
                     _save_event(f_info["original_name"], image_path, result, get_taiwan_time_str(), google_sheets)
+                    success_count += 1
+                    current_app.logger.info(f"完成分析 [{idx + 1}/{len(files)}]: {f_info['original_name']}")
+                    
                 except Exception as e:
-                    current_app.logger.error(f"分析失敗 {f_info.get('original_name')}: {e}")
+                    failed_count += 1
+                    current_app.logger.error(f"分析失敗 [{idx + 1}/{len(files)}] {f_info.get('original_name')}: {e}")
+                    # 發生錯誤不中斷，繼續下一張
+                    continue
+                    
+            current_app.logger.info(f"批次分析完成：成功 {success_count} 張，失敗 {failed_count} 張")
     finally:
         processing_status["is_processing"] = False
 
