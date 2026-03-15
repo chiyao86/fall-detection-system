@@ -126,15 +126,41 @@ docker-compose exec web flask db upgrade
 
 ### 3. 部署流程
 
-`start.sh` 腳本會自動：
-1. 執行 `init_db.py` 進行資料庫初始化和遷移
-2. 驗證資料表是否正確建立
-3. 啟動 Gunicorn 應用程式
+`init_db.py` 腳本會自動：
+1. 嘗試使用 Flask-Migrate 執行資料庫遷移
+2. 如果遷移失敗，會使用 SQLAlchemy 直接創建資料表
+3. 驗證資料表是否正確建立
+4. 顯示詳細的執行日誌
 
-> **注意**: 如果遇到資料庫遷移問題，可以在 Render Shell 中手動執行：
-> ```bash
-> python init_db.py
-> ```
+部署完成後，檢查 Render 的部署日誌，確認看到：
+- `✓ 資料庫初始化完成！`
+- `✓ 資料表驗證成功`
+
+### 4. 故障排除
+
+如果部署後仍然出現 "relation fall_events does not exist" 錯誤：
+
+**方案 A: 在 Render Shell 中手動執行**
+1. 進入 Render Dashboard → 你的 Web Service
+2. 點擊右上角的 "Shell"
+3. 執行以下命令：
+   ```bash
+   python init_db.py
+   ```
+4. 確認看到成功訊息後，重啟服務
+
+**方案 B: 檢查 migrations 目錄**
+1. 確認 `migrations/versions/` 目錄有被推送到 GitHub
+2. 執行 `git status` 確認 migrations 檔案已提交
+3. 檢查 Render 日誌中是否有找到遷移檔案
+
+**方案 C: 重置資料庫**
+1. 在 Render Dashboard 刪除現有的 PostgreSQL 資料庫
+2. 創建新的 PostgreSQL 資料庫
+3. 更新 Web Service 的 `DATABASE_URL` 環境變數
+4. 重新部署
+
+> **注意**: `init_db.py` 會先嘗試使用 Flask-Migrate，失敗時會自動使用 SQLAlchemy 直接創建資料表，確保資料庫一定會被正確初始化。
 
 
 ## API Endpoints
