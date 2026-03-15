@@ -88,15 +88,22 @@ def analyze_single_image(image_path: str, custom_prompt: str | None = None) -> d
     image = None
     try:
         image = Image.open(image_path)
+        
+        # 壓縮圖片以減少傳輸時間和 API 成本
+        max_size = (1024, 1024)  # 限制最大尺寸
+        if image.size[0] > max_size[0] or image.size[1] > max_size[1]:
+            image.thumbnail(max_size, Image.Resampling.LANCZOS)
+            current_app.logger.info(f"圖片已壓縮至 {image.size}")
+        
         b64 = encode_image(image)
 
         prompt = custom_prompt or FALL_DETECTION_PROMPT
 
         client = Groq(api_key=api_key)
         
-        # 重試機制 - 最多重試 3 次
-        max_retries = 3
-        retry_delay = 2  # 秒
+        # 重試機制 - 最多重試 4 次（平衡速度和穩定性）
+        max_retries = 4
+        base_delay = 2  # 基礎延遲 2 秒（折中方案）
         
         for attempt in range(max_retries):
             try:
@@ -123,20 +130,37 @@ def analyze_single_image(image_path: str, custom_prompt: str | None = None) -> d
                 raw = completion.choices[0].message.content
                 result = _parse_json_response(raw)
                 
-                # 添加延遲，避免速率限制（每次請求後等待）
-                time.sleep(1.5)
+                # 免費版延遲：2-3 秒（平衡速度和速率限制）
+                time.sleep(base_delay + (attempt * 0.3))
                 
                 return result
                 
             except Exception as e:
                 error_msg = str(e)
-                if "rate_limit" in error_msg.lower() or "429" in error_msg:
-                    # 速率限制錯誤，等待更長時間
+                
+                # 檢查是否為速率限制或配額用盡
+                if "rate_limit" in error_msg.lower() or "429" in error_msg or "quota" in error_msg.lower():
                     if attempt < max_retries - 1:
-                        wait_time = retry_delay * (attempt + 1) * 2  # 指數退避
-                        current_app.logger.warning(f"遇到速率限制，等待 {wait_time} 秒後重試...")
+                        # 速率限制：較短的指數退避 2s, 4s, 8s, 16s
+                        wait_time = base_delay * (2 ** attempt)
+                        current_app.logger.warning(
+                            f"⚠️ Groq API 速率限制（嘗試 {attempt + 1}/{max_retries}），"
+                            f"等待 {wait_time} 秒後重試..."
+                        )
                         time.sleep(wait_time)
                         continue
+                    else:
+                        # 所有重試都失敗
+                        current_app.logger.error(
+                            "❌ Groq API 配額可能已用盡。"
+                            "建議：1) 一次只處理 2-3 張圖片 2) 等待 1 分鐘後再試 3) 使用序列模式減少 API 調用"
+                        )
+                        raise ValueError(
+                            "Groq API 請求失敗：免費配額已用盡或速率限制。"
+                            "請稍後再試或一次處理較少圖片。"
+                        )
+                
+                # 其他錯誤直接拋出
                 raise e
                 
     finally:

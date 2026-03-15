@@ -22,6 +22,9 @@ processing_status = {
     "current_file": "",
 }
 
+# 線程鎖，防止進度狀態被多個請求同時修改
+status_lock = threading.Lock()
+
 
 def _save_event(filename: str, image_path: str, result: dict, timestamp_str: str, google_sheets: bool):
     """將分析結果寫入 DB、通知、Google Sheets（需在 app_context 內呼叫）"""
@@ -56,14 +59,17 @@ def _batch_individual(app, files: list, custom_prompt: str | None, google_sheets
     try:
         with app.app_context():
             for idx, f_info in enumerate(files):
-                try:
+                # 更新進度 - 使用鎖確保線程安全
+                with status_lock:
                     processing_status["current"] = idx + 1
                     processing_status["current_file"] = f_info["original_name"]
-
+                
+                try:
                     image_path = f_info["path"]
                     if not os.path.exists(image_path):
                         current_app.logger.warning(f"檔案不存在，跳過: {image_path}")
                         failed_count += 1
+                        # 即使失敗，進度條也要繼續向前
                         continue
 
                     current_app.logger.info(f"開始分析 [{idx + 1}/{len(files)}]: {f_info['original_name']}")
@@ -76,11 +82,15 @@ def _batch_individual(app, files: list, custom_prompt: str | None, google_sheets
                     failed_count += 1
                     current_app.logger.error(f"分析失敗 [{idx + 1}/{len(files)}] {f_info.get('original_name')}: {e}")
                     # 發生錯誤不中斷，繼續下一張
+                    # 進度已在 for 迴圈開始時更新，不會回退
                     continue
                     
             current_app.logger.info(f"批次分析完成：成功 {success_count} 張，失敗 {failed_count} 張")
-    finally:
-        processing_status["is_processing"] = False
+    finawith status_lock:
+            processing_status["is_processing"] = False
+            # 確保最終進度顯示為 100%
+            # 確保最終進度顯示為 100%
+        processing_status["current"] = processing_status["total"]
 
 
 def _batch_sequence(app, files: list, custom_prompt: str | None, google_sheets: bool):
@@ -164,5 +174,8 @@ def analyze():
 
 
 @analyze_bp.route("/api/status", methods=["GET"])
-def status():
+def # 使用鎖確保讀取的狀態一致
+    with status_lock:
+        status_copy = processing_status.copy()
+    return jsonify({"success": True, "status": status_copy
     return jsonify({"success": True, "status": processing_status})
