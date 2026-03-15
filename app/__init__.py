@@ -22,16 +22,6 @@ def create_app(config_class=Config) -> Flask:
     db.init_app(app)
     migrate.init_app(app, db)
 
-    # 自動執行資料庫遷移（適用於生產環境部署）
-    with app.app_context():
-        try:
-            # 嘗試升級資料庫到最新版本
-            from flask_migrate import upgrade
-            upgrade()
-            print("✓ 資料庫遷移完成")
-        except Exception as e:
-            print(f"⚠ 資料庫遷移失敗（可能已是最新版本）: {e}")
-
     # 註冊 Blueprints
     from app.api.upload import upload_bp
     from app.api.analyze import analyze_bp

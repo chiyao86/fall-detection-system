@@ -102,6 +102,41 @@ docker-compose exec web flask db migrate -m "initial"
 docker-compose exec web flask db upgrade
 ```
 
+## Render 部署
+
+### 1. 建立 PostgreSQL 資料庫
+
+在 Render 控制台建立一個 PostgreSQL 資料庫，並取得 `DATABASE_URL`。
+
+### 2. 建立 Web Service
+
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `bash start.sh`
+- **Environment Variables**: 設定以下環境變數
+  - `DATABASE_URL`: PostgreSQL 資料庫連線 URL（Render 會自動提供）
+  - `SECRET_KEY`: Flask 密鑰
+  - `GROQ_API_KEY`: Groq API 金鑰
+  - `LINE_CHANNEL_ACCESS_TOKEN`: LINE Bot Token（選填）
+  - `LINE_USER_ID`: LINE 使用者 ID（選填）
+  - `TWILIO_ACCOUNT_SID`: Twilio SID（選填）
+  - `TWILIO_AUTH_TOKEN`: Twilio Token（選填）
+  - `TWILIO_FROM_NUMBER`: Twilio 發送號碼（選填）
+  - `TWILIO_TO_NUMBER`: Twilio 接收號碼（選填）
+  - `GOOGLE_SPREADSHEET_ID`: Google Sheets ID（選填）
+
+### 3. 部署流程
+
+`start.sh` 腳本會自動：
+1. 執行 `init_db.py` 進行資料庫初始化和遷移
+2. 驗證資料表是否正確建立
+3. 啟動 Gunicorn 應用程式
+
+> **注意**: 如果遇到資料庫遷移問題，可以在 Render Shell 中手動執行：
+> ```bash
+> python init_db.py
+> ```
+
+
 ## API Endpoints
 
 | Method | Path             | 說明               |
