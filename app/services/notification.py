@@ -9,6 +9,7 @@ def send_line_message(description: str, filename: str, timestamp: str) -> bool:
     user_id = current_app.config.get("LINE_USER_ID", "")
 
     if not token or not user_id:
+        current_app.logger.debug("LINE 通知跳過（未設定 LINE 憑證）")
         return False
 
     try:
@@ -26,7 +27,7 @@ def send_line_message(description: str, filename: str, timestamp: str) -> bool:
         current_app.logger.info(f"LINE 通知已發送: {filename}")
         return True
     except Exception as e:
-        current_app.logger.error(f"LINE 發送失敗: {e}")
+        current_app.logger.warning(f"LINE 發送失敗（可能是憑證無效）: {e}")
         return False
 
 
@@ -38,6 +39,7 @@ def send_sms(description: str, filename: str, timestamp: str) -> bool:
     to_num = current_app.config.get("TWILIO_TO_NUMBER", "")
 
     if not all([sid, token, from_num, to_num]):
+        current_app.logger.debug("SMS 通知跳過（未設定 Twilio 憑證）")
         return False
 
     try:
@@ -53,7 +55,7 @@ def send_sms(description: str, filename: str, timestamp: str) -> bool:
         current_app.logger.info(f"SMS 通知已發送: {filename}")
         return True
     except Exception as e:
-        current_app.logger.error(f"SMS 發送失敗: {e}")
+        current_app.logger.warning(f"SMS 發送失敗（可能是憑證無效或餘額不足）: {e}")
         return False
 
 
