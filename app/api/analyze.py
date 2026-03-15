@@ -86,11 +86,11 @@ def _batch_individual(app, files: list, custom_prompt: str | None, google_sheets
                     continue
                     
             current_app.logger.info(f"批次分析完成：成功 {success_count} 張，失敗 {failed_count} 張")
-    finawith status_lock:
+    finally:
+        with status_lock:
             processing_status["is_processing"] = False
             # 確保最終進度顯示為 100%
-            # 確保最終進度顯示為 100%
-        processing_status["current"] = processing_status["total"]
+            processing_status["current"] = processing_status["total"]
 
 
 def _batch_sequence(app, files: list, custom_prompt: str | None, google_sheets: bool):
@@ -174,8 +174,8 @@ def analyze():
 
 
 @analyze_bp.route("/api/status", methods=["GET"])
-def # 使用鎖確保讀取的狀態一致
+def status():
+    """查詢處理進度 - 使用鎖確保讀取的狀態一致"""
     with status_lock:
         status_copy = processing_status.copy()
-    return jsonify({"success": True, "status": status_copy
-    return jsonify({"success": True, "status": processing_status})
+    return jsonify({"success": True, "status": status_copy})
